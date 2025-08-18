@@ -5,63 +5,29 @@ import CategoryFilter from './components/CategoryFilter';
 import StatusFilter, { type Status } from './components/StatusFilter';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-
-export type Todo = {
-  id: string;
-  text: string;
-  category: string;
-  completed: boolean;
-};
-
-const DEFAULT_CATEGORIES = ['Work', 'Study', 'Personal'];
-
-const LS_KEYS = {
-  todos: 'todos',
-  categories: 'categories',
-  filters: 'filters'
-} as const;
-
-function loadLS<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function saveLS<T>(key: string, value: T) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch { /* empty */ }
-}
-
-function makeId() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
+import { loadLS, saveLS, makeId, LS_KEYS, DEFAULT_CATEGORIES, type Todo } from './assets/LocalStorage';
 
 export default function App() {
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+  const [todos, setTodos] = useState<Todo[]>(() => loadLS<Todo[]>(LS_KEYS.todos, []));
+  const [categories, setCategories] = useState<string[]>(() =>
+    loadLS<string[]>(LS_KEYS.categories, DEFAULT_CATEGORIES)
+  );
   const [{ filterCategory, filterStatus }, setFilters] = useState<{
-    filterCategory: string; 
+    filterCategory: string;
     filterStatus: Status;
-  }>({ filterCategory: '', filterStatus: 'all' });
-
-  useEffect(() => {
-    setTodos(loadLS<Todo[]>(LS_KEYS.todos, []));
-    setCategories(loadLS<string[]>(LS_KEYS.categories, DEFAULT_CATEGORIES));
-    const savedFilters = loadLS<{ filterCategory: string; filterStatus: Status }>(
-      LS_KEYS.filters,
-      { filterCategory: '', filterStatus: 'all' }
-    );
-    setFilters(savedFilters);
-  }, []);
+  }>(() =>
+    loadLS<{ filterCategory: string; filterStatus: Status }>(LS_KEYS.filters, {
+      filterCategory: '',
+      filterStatus: 'all',
+    })
+  );
 
   useEffect(() => saveLS(LS_KEYS.todos, todos), [todos]);
   useEffect(() => saveLS(LS_KEYS.categories, categories), [categories]);
-  useEffect(() => saveLS(LS_KEYS.filters, { filterCategory, filterStatus }), [filterCategory, filterStatus]);
+  useEffect(
+    () => saveLS(LS_KEYS.filters, { filterCategory, filterStatus }),
+    [filterCategory, filterStatus]
+  );
 
   function addTodo(text: string, category: string) {
     const next: Todo = { id: makeId(), text, category, completed: false };
