@@ -1,115 +1,93 @@
-import { useEffect, useMemo, useState } from 'react';
-import AddTodoForm from './components/AddTodoForm';
-import TodoList from './components/TodoList';
-import CategoryFilter from './components/CategoryFilter';
-import StatusFilter, { type Status } from './components/StatusFilter';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { useEffect, useState } from "react";
+import AddTodoForm from "./components/AddTodoForm";
+import TodoList from "./components/TodoList";
+import CategoryFilter from "./components/CategoryFilter";
+import StatusFilter, { type Status } from "./components/StatusFilter";
+import AuthForm from "./components/AuthForm";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
-export type Todo = {
-  _id: string;
-  title: string;
-  category: string;
-  completed: boolean;
-};
+type Todo = { _id: string; title: string; category: string; completed: boolean };
 
 export default function App() {
+  const [token, setToken] = useState(localStorage.getItem("token"));
   const [todos, setTodos] = useState<Todo[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
-  const [{ filterCategory, filterStatus }, setFilters] = useState({
-    filterCategory: '',
-    filterStatus: 'all' as Status,
-  });
-
-  const API = "http://localhost:5000/api/todos";
+  const [filterStatus, setFilterStatus] = useState<Status>("all");
+  const [filterCategory, setFilterCategory] = useState("");
 
   useEffect(() => {
-    (async () => {
-      const res = await fetch(API);
-      const data = await res.json();
-      setTodos(data);
-      const uniqueCategories = [...new Set(data.map((t: Todo) => t.category))] as string[];
-      setCategories(uniqueCategories);
-    })();
-  }, []);
+    if (!token) return;
+    fetch("http://localhost:4000/api/todos", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then((data: Todo[]) => {
+        setTodos(data);
+        setCategories([...new Set(data.map(t => t.category))] as string[]);
+      });
+  }, [token]);
 
-  async function addTodo(text: string, category: string) {
-    const res = await fetch(API, {
+  async function addTodo(title: string, category: string) {
+    const res = await fetch("http://localhost:4000/api/todos", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, category })
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ title, category }),
     });
     const newTodo = await res.json();
     setTodos(prev => [newTodo, ...prev]);
-    setCategories(prev => prev.includes(category) ? prev : [...prev, category]);
-    toast.success('Task added');
-  }
-
-  async function deleteTodo(id: string) {
-    await fetch(`${API}/${id}`, { method: "DELETE" });
-    setTodos(prev => prev.filter(t => t._id !== id));
-    toast.info('Task deleted');
   }
 
   async function toggleCompleted(id: string) {
     const todo = todos.find(t => t._id === id);
     if (!todo) return;
-    const res = await fetch(`${API}/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ completed: !todo.completed })
+    const res = await fetch(`http://localhost:4000/api/todos/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ completed: !todo.completed }),
     });
     const updated = await res.json();
-    setTodos(prev => prev.map(t => t._id === id ? updated : t));
+    setTodos(prev => prev.map(t => (t._id === id ? updated : t)));
   }
 
-  async function clearAll() {
-    if (!confirm('Clear ALL tasks?')) return;
-    await Promise.all(todos.map(t => fetch(`${API}/${t._id}`, { method: "DELETE" })));
-    setTodos([]);
-    toast('All tasks cleared');
-  }
-
-  const filteredTodos = useMemo(() => {
-    return todos.filter(t => {
-      const categoryOk = !filterCategory || t.category === filterCategory;
-      const statusOk =
-        filterStatus === 'all' ||
-        (filterStatus === 'completed' ? t.completed : !t.completed);
-      return categoryOk && statusOk;
+  async function deleteTodo(id: string) {
+    await fetch(`http://localhost:4000/api/todos/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
     });
-  }, [todos, filterCategory, filterStatus]);
+    setTodos(prev => prev.filter(t => t._id !== id));
+  }
+
+  if (!token) {
+    return <AuthForm onAuth={setToken} />;
+  }
 
   return (
     <div className="container">
       <div className="header">
         <div className="title">To-Do List</div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={clearAll}>Clear All</button>
-        </div>
+        <button onClick={() => { localStorage.removeItem("token"); setToken(null); }}>Logout</button>
       </div>
 
-      <div className="panel" style={{ marginBottom: 14 }}>
-        <AddTodoForm categories={categories} onAdd={addTodo} />
-      </div>
-
+      <AddTodoForm categories={categories} onAdd={addTodo} />
       <div className="grid">
-        <div className="controls">
-          <CategoryFilter
-            categories={categories}
-            value={filterCategory}
-            onChange={(v) => setFilters((f) => ({ ...f, filterCategory: v }))} />
-          <StatusFilter
-            value={filterStatus}
-            onChange={(v) => setFilters((f) => ({ ...f, filterStatus: v }))} />
-        </div>
-
-        <div className="panel">
-          <TodoList todos={filteredTodos} onToggle={toggleCompleted} onDelete={deleteTodo} />
-        </div>
+        <CategoryFilter categories={categories} value={filterCategory} onChange={setFilterCategory} />
+        <StatusFilter value={filterStatus} onChange={setFilterStatus} />
       </div>
 
-      <ToastContainer position="top-center" autoClose={1400} closeOnClick pauseOnHover />
+      <TodoList
+        todos={todos.filter(t =>
+          (!filterCategory || t.category === filterCategory) &&
+          (filterStatus === "all" ||
+            (filterStatus === "completed" ? t.completed : !t.completed))
+        )}
+        onToggle={toggleCompleted}
+        onDelete={deleteTodo}
+      />
+      <ToastContainer position="top-center" autoClose={1200} />
     </div>
   );
 }
