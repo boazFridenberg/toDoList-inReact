@@ -1,8 +1,8 @@
 import type { CSSProperties } from 'react';
 
 export type Todo = {
-  id: string;
-  text: string;
+  _id: string;
+  title: string;
   category: string;
   completed: boolean;
 };
@@ -14,7 +14,6 @@ type Props = {
 };
 
 function colorFromCategory(category: string): CSSProperties {
-  // Stable pastel color based on category string
   let hash = 0;
   for (let i = 0; i < category.length; i++) {
     hash = (hash << 5) - hash + category.charCodeAt(i);
@@ -34,15 +33,15 @@ export default function TodoItem({ todo, onToggle, onDelete }: Props) {
         className="checkbox"
         type="checkbox"
         checked={todo.completed}
-        onChange={() => onToggle(todo.id)}
-        aria-label={`Toggle ${todo.text}`}
+        onChange={() => onToggle(todo._id)}
+        aria-label={`Toggle ${todo.title}`}
       />
       <div className="text">
-        <span className={`task ${todo.completed ? 'done' : ''}`}>{todo.text}</span>
-        <small style={{ opacity: .7 }}>Category: {todo.category}</small>
+        <span className={`task ${todo.completed ? 'done' : ''}`}>{todo.title}</span>
+        <small style={{ opacity: 0.7 }}>Category: {todo.category}</small>
       </div>
       <span className="badge" style={colorFromCategory(todo.category)}>{todo.category}</span>
-      <button className="danger" onClick={() => onDelete(todo.id)} aria-label={`Delete ${todo.text}`}>
+      <button className="danger" onClick={() => onDelete(todo._id)} aria-label={`Delete ${todo.title}`}>
         Delete
       </button>
     </li>

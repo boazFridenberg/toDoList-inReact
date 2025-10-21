@@ -7,14 +7,12 @@ type Props = {
 
 export default function AddTodoForm({ categories, onAdd }: Props) {
   const [text, setText] = useState('');
-  const [category, setCategory] = useState(categories[0] ?? 'General');
+  const [category, setCategory] = useState(categories[0] ?? 'work');
 
-  // keep selected category in sync if categories change (first render / storage load)
   useEffect(() => {
     if (!categories.length) return;
     if (!categories.includes(category)) setCategory(categories[0]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categories]);
+  }, [categories, category]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +31,6 @@ export default function AddTodoForm({ categories, onAdd }: Props) {
         onChange={(e) => setText(e.target.value)}
         aria-label="Task name"
       />
-      {/* Use datalist to allow both pick existing or type new category */}
       <input
         list="category-options"
         placeholder="Category… (e.g., Work)"

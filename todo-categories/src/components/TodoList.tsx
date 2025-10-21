@@ -14,7 +14,7 @@ export default function TodoList({ todos, onToggle, onDelete }: Props) {
   return (
     <ul className="list">
       {todos.map((t) => (
-        <TodoItem key={t.id} todo={t} onToggle={onToggle} onDelete={onDelete} />
+        <TodoItem key={t._id} todo={t} onToggle={onToggle} onDelete={onDelete} />
       ))}
     </ul>
   );

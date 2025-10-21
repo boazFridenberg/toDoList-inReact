@@ -5,56 +5,73 @@ import CategoryFilter from './components/CategoryFilter';
 import StatusFilter, { type Status } from './components/StatusFilter';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { loadLS, saveLS, makeId, LS_KEYS, DEFAULT_CATEGORIES, type Todo } from './assets/LocalStorage';
+
+export type Todo = {
+  _id: string;
+  title: string;
+  category: string;
+  completed: boolean;
+};
 
 export default function App() {
-  const [todos, setTodos] = useState<Todo[]>(() => loadLS<Todo[]>(LS_KEYS.todos, []));
-  const [categories, setCategories] = useState<string[]>(() =>
-    loadLS<string[]>(LS_KEYS.categories, DEFAULT_CATEGORIES)
-  );
-  const [{ filterCategory, filterStatus }, setFilters] = useState<{
-    filterCategory: string;
-    filterStatus: Status;
-  }>(() =>
-    loadLS<{ filterCategory: string; filterStatus: Status }>(LS_KEYS.filters, {
-      filterCategory: '',
-      filterStatus: 'all',
-    })
-  );
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [{ filterCategory, filterStatus }, setFilters] = useState({
+    filterCategory: '',
+    filterStatus: 'all' as Status,
+  });
 
-  useEffect(() => saveLS(LS_KEYS.todos, todos), [todos]);
-  useEffect(() => saveLS(LS_KEYS.categories, categories), [categories]);
-  useEffect(
-    () => saveLS(LS_KEYS.filters, { filterCategory, filterStatus }),
-    [filterCategory, filterStatus]
-  );
+  const API = "http://localhost:5000/api/todos";
 
-  function addTodo(text: string, category: string) {
-    const next: Todo = { id: makeId(), text, category, completed: false };
-    setTodos((prev) => [next, ...prev]);
-    setCategories((prev) => (prev.includes(category) ? prev : [...prev, category]));
+  useEffect(() => {
+    (async () => {
+      const res = await fetch(API);
+      const data = await res.json();
+      setTodos(data);
+      const uniqueCategories = [...new Set(data.map((t: Todo) => t.category))] as string[];
+      setCategories(uniqueCategories);
+    })();
+  }, []);
+
+  async function addTodo(text: string, category: string) {
+    const res = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, category })
+    });
+    const newTodo = await res.json();
+    setTodos(prev => [newTodo, ...prev]);
+    setCategories(prev => prev.includes(category) ? prev : [...prev, category]);
     toast.success('Task added');
   }
 
-  function deleteTodo(id: string) {
-    setTodos((prev) => prev.filter((t) => t.id !== id));
+  async function deleteTodo(id: string) {
+    await fetch(`${API}/${id}`, { method: "DELETE" });
+    setTodos(prev => prev.filter(t => t._id !== id));
     toast.info('Task deleted');
   }
 
-  function toggleCompleted(id: string) {
-    setTodos((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
-    );
+  async function toggleCompleted(id: string) {
+    const todo = todos.find(t => t._id === id);
+    if (!todo) return;
+    const res = await fetch(`${API}/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ completed: !todo.completed })
+    });
+    const updated = await res.json();
+    setTodos(prev => prev.map(t => t._id === id ? updated : t));
   }
 
-  function clearAll() {
+  async function clearAll() {
     if (!confirm('Clear ALL tasks?')) return;
+    await Promise.all(todos.map(t => fetch(`${API}/${t._id}`, { method: "DELETE" })));
     setTodos([]);
     toast('All tasks cleared');
   }
 
   const filteredTodos = useMemo(() => {
-    return todos.filter((t) => {
+    return todos.filter(t => {
       const categoryOk = !filterCategory || t.category === filterCategory;
       const statusOk =
         filterStatus === 'all' ||
@@ -81,12 +98,10 @@ export default function App() {
           <CategoryFilter
             categories={categories}
             value={filterCategory}
-            onChange={(v) => setFilters((f) => ({ ...f, filterCategory: v }))}
-          />
+            onChange={(v) => setFilters((f) => ({ ...f, filterCategory: v }))} />
           <StatusFilter
             value={filterStatus}
-            onChange={(v) => setFilters((f) => ({ ...f, filterStatus: v }))}
-          />
+            onChange={(v) => setFilters((f) => ({ ...f, filterStatus: v }))} />
         </div>
 
         <div className="panel">
